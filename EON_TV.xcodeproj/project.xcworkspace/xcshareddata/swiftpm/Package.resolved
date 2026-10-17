@@ -1,0 +1,15 @@
+{
+  "originHash" : "f4d5d295e3bbd431739a2bba3816b954900e2abb9f707f16d9dd1c0107bf6b1a",
+  "pins" : [
+    {
+      "identity" : "eonkit-binary",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/hpstuff/EONKit-Binary.git",
+      "state" : {
+        "revision" : "69d028e8c32ab8908e4aa7352a1e05c0a3fa1c74",
+        "version" : "1.0.2"
+      }
+    }
+  ],
+  "version" : 3
+}
