@@ -42,10 +42,11 @@ scheme is what made this client possible. Thank you.
 
 ## Requirements
 
-- Xcode 26 or later (built and tested with the tvOS 27 SDK).
-- Deployment target tvOS 26.0. The only dependency is the private `EONKit` package, which
-  Xcode resolves over SSH (`git@github.com:hpstuff/EONKit.git`), so the GitHub account your
-  Xcode or git uses needs read access to that repository.
+- Xcode 27.1 or later (built and tested with the tvOS 27 SDK).
+- Deployment target tvOS 26.0. The only dependency is the EON platform SDK, consumed as a
+  prebuilt framework from the public
+  [EONKit-Binary](https://github.com/hpstuff/EONKit-Binary) package. Its source is private, but
+  nothing about building the app needs access to it.
 - No signing team is committed. Pick your own team under **Signing & Capabilities** before you
   build on a device.
 - Client credentials are not committed. Copy `Secrets.example.swift` to
@@ -65,8 +66,7 @@ cp Secrets.example.swift EON_TV/App/Secrets.swift
 ```
 
 **In CI** – set these repository secrets under *Settings → Secrets and variables →
-Actions*. The build workflow writes the file from the first four and uses the last one to
-fetch the private package:
+Actions*. The build workflow writes the file from them:
 
 | Secret | Holds |
 | --- | --- |
@@ -74,7 +74,6 @@ fetch the private package:
 | `EON_ANDROIDTV_CLIENT_SECRET` | Android TV client secret |
 | `EON_WEB_CLIENT_ID` | Web client id |
 | `EON_WEB_CLIENT_SECRET` | Web client secret |
-| `EONKIT_DEPLOY_KEY` | Private half of a read-only deploy key added to the `EONKit` repository |
 
 Note that a client secret shipped inside an app is not really secret: it is in the binary and
 can be read out of it. Keeping it out of the repository is hygiene, not protection. These

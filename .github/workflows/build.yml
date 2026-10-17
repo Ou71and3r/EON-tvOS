@@ -8,16 +8,12 @@ on:
 
 jobs:
   build:
-    runs-on: macos-15
+    # The SDK binary and the app need Xcode 27.1; the macos-26 images stop at Xcode 26.
+    runs-on: xcode-27
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
     steps:
       - uses: actions/checkout@v4
-
-      # The SDK is the private EONKit package, resolved over SSH. The deploy key has
-      # read access to that repository only.
-      - name: Grant access to the EONKit package
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.EONKIT_DEPLOY_KEY }}
 
       # The app needs the EON client credentials at runtime, so CI writes the
       # untracked Secrets.swift from repository secrets before building.
@@ -37,12 +33,13 @@ jobs:
           }
           EOF
 
+      # pipefail so a failing xcodebuild fails the step instead of the formatter's exit code winning.
       - name: Build
         run: |
+          set -o pipefail
           xcodebuild build \
             -project EON_TV.xcodeproj \
             -scheme EON_TV \
             -destination 'generic/platform=tvOS Simulator' \
-            -scmProvider system \
             CODE_SIGNING_ALLOWED=NO \
-            | xcpretty || exit ${PIPESTATUS[0]}
+            | xcbeautify
