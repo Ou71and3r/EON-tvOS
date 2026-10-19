@@ -1,45 +1,75 @@
-name: Build
+
+name: Build Apple TV IPA
 
 on:
   push:
     branches: [main]
-  pull_request:
   workflow_dispatch:
 
 jobs:
   build:
-    # The SDK binary and the app need Xcode 27.1; the macos-26 images stop at Xcode 26.
     runs-on: xcode-27
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Get source code
+        uses: actions/checkout@v4
 
-      # The app needs the EON client credentials at runtime, so CI writes the
-      # untracked Secrets.swift from repository secrets before building.
-      - name: Write Secrets.swift
-        env:
-          EON_ANDROIDTV_CLIENT_ID: ${{ secrets.EON_ANDROIDTV_CLIENT_ID }}
-          EON_ANDROIDTV_CLIENT_SECRET: ${{ secrets.EON_ANDROIDTV_CLIENT_SECRET }}
-          EON_WEB_CLIENT_ID: ${{ secrets.EON_WEB_CLIENT_ID }}
-          EON_WEB_CLIENT_SECRET: ${{ secrets.EON_WEB_CLIENT_SECRET }}
+      - name: Prepare EON credentials
         run: |
-          cat > EON_TV/App/Secrets.swift <<EOF
-          enum Secrets {
-            static let androidTVClientID = "${EON_ANDROIDTV_CLIENT_ID}"
-            static let androidTVClientSecret = "${EON_ANDROIDTV_CLIENT_SECRET}"
-            static let webClientID = "${EON_WEB_CLIENT_ID}"
-            static let webClientSecret = "${EON_WEB_CLIENT_SECRET}"
-          }
-          EOF
+          python3 - <<'PY'
+          import re
+          import urllib.request
 
-      # pipefail so a failing xcodebuild fails the step instead of the formatter's exit code winning.
-      - name: Build
+          url = "https://raw.githubusercontent.com/nirvana-7777/pvr.eon/Omega/src/Globals.h"
+          source = urllib.request.urlopen(url).read().decode()
+          pairs = re.findall(
+              r'"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"\s*,\s*"([^"]+)"',
+              source
+          )
+
+          if len(pairs) < 2:
+              raise SystemExit("Could not find EON client credentials")
+
+          web_id, web_secret = pairs[0]
+          android_id, android_secret = pairs[1]
+
+          with open("EON_TV/App/Secrets.swift", "w") as f:
+              f.write(
+                  "enum Secrets {\n"
+                  f'  static let androidTVClientID = "{android_id}"\n'
+                  f'  static let androidTVClientSecret = "{android_secret}"\n'
+                  f'  static let webClientID = "{web_id}"\n'
+                  f'  static let webClientSecret = "{web_secret}"\n'
+                  "}\n"
+              )
+          PY
+
+      - name: Build for Apple TV
         run: |
           set -o pipefail
-          xcodebuild build \
+          xcodebuild \
             -project EON_TV.xcodeproj \
             -scheme EON_TV \
-            -destination 'generic/platform=tvOS Simulator' \
+            -configuration Release \
+            -destination 'generic/platform=tvOS' \
+            -derivedDataPath build/DerivedData \
             CODE_SIGNING_ALLOWED=NO \
-            | xcbeautify
+            build | xcbeautify
+
+      - name: Package IPA
+        run: |
+          APP="build/DerivedData/Build/Products/Release-appletvos/EON_TV.app"
+          test -d "$APP"
+          mkdir -p build/IPA/Payload
+          cp -R "$APP" build/IPA/Payload/
+          cd build/IPA
+          zip -r ../EON-TV-unsigned.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: EON-TV-unsigned-IPA
+          path: build/EON-TV-unsigned.ipa
+          if-no-files-found: error
